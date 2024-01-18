@@ -18,6 +18,20 @@
 
 #include "secretflowapis/v2/sdc/ual.pb.h"
 
+#include <sgx_report.h>
+#include <sgx_quote.h>
+
+#define RCCAST(t, v) reinterpret_cast<t>(const_cast<char*>((v)))
+
+#define SGXIOC_GET_DCAP_QUOTE_SIZE _IOR('s', 7, uint32_t)
+#define SGXIOC_GEN_DCAP_QUOTE _IOWR('s', 8, sgxioc_gen_dcap_quote_arg_t)
+
+typedef struct {
+  sgx_report_data_t* report_data;  // input
+  uint32_t* quote_len;             // input/output
+  uint8_t* quote_buf;              // output
+} sgxioc_gen_dcap_quote_arg_t;
+
 namespace teeapps {
 namespace utils {
 

@@ -16,62 +16,72 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
-#include "attestation/generation/ua_generation.h"
 #include "cppcodec/base64_rfc4648.hpp"
 #include "rapidjson/document.h"
-#include "sgx_quote.h"
+#include "sgx_ql_quote.h"
+#include "sgx_qve_header.h"
 #include "spdlog/spdlog.h"
 #include "yacl/crypto/base/hash/hash_utils.h"
+
+#include <fcntl.h>
+#include <sys/ioctl.h>
 
 namespace teeapps {
 namespace utils {
 
-namespace {
-constexpr char kB64Quote[] = "b64_quote";
-}
+// References:
+// https://github.com/secretflow/jinzhao-attest/blob/master/ual/generation/platforms/sgx2/untrusted/generator_sgx_dcap.cpp
+// https://github.com/occlum/occlum/blob/master/test/ioctl/main.c
+std::string GenOcclumQuote(yacl::ByteContainerView user_data) {
+    int sgx_fd;
+    sgx_fd = open("/dev/sgx", O_RDONLY);
+    YACL_ENFORCE(sgx_fd >= 0, "Fail to open /dev/sgx");
 
-kubetee::UnifiedAttestationReport GenKubeteeRaReport(
-    yacl::ByteContainerView user_data) {
-  auto digest = yacl::crypto::Sha256(user_data);
-  kubetee::attestation::UaReportGenerationParameters gen_param;
-  gen_param.tee_identity = "1";
-  gen_param.report_type = "Passport";
-  kubetee::UnifiedAttestationReportParams param;
-  param.set_hex_user_data(absl::BytesToHexString(absl::string_view(
-      reinterpret_cast<const char*>(digest.data()), digest.size())));
-  gen_param.others = param;
+    uint32_t quote_size = 0;
+    YACL_ENFORCE(ioctl(sgx_fd, SGXIOC_GET_DCAP_QUOTE_SIZE, &quote_size) >= 0,
+            "Fail to get quote size");
 
-  kubetee::UnifiedAttestationReport report;
+    auto digest = yacl::crypto::Sha256(user_data);
+    YACL_ENFORCE(digest.size() <= SGX_REPORT_DATA_SIZE, "Report data should be 32");
+    sgx_report_data_t report_data = { 0 };
+    memcpy(report_data.d, digest.data(), digest.size());
 
-  TeeErrorCode err = UaGenerateReport(&gen_param, &report);
-  YACL_ENFORCE_EQ(err, TEE_SUCCESS,
-                  "Generating UAL report failed, error code: {:#x}", err);
-  return report;
+    std::string quote;
+    quote.resize(quote_size, 0);
+  sgxioc_gen_dcap_quote_arg_t gen_quote_arg = {
+      .report_data = &report_data,
+      .quote_len = &quote_size,
+      .quote_buf = RCCAST(uint8_t*, quote.data())};
+  YACL_ENFORCE(ioctl(sgx_fd, SGXIOC_GEN_DCAP_QUOTE, &gen_quote_arg) >= 0, "Fail to get quote");
+
+  sgx_quote_t* quote_ptr = RCCAST(sgx_quote_t*, quote.data());
+  YACL_ENFORCE(memcmp(
+              (void *)&(quote_ptr->report_body.report_data),
+              (void *)&report_data,
+              sizeof(sgx_report_data_t)) == 0,
+          "mismathced report data");
+
+  std::string b64_quote = cppcodec::base64_rfc4648::encode(quote.data(), quote.size());
+  return b64_quote;
 }
 
 secretflowapis::v2::sdc::UnifiedAttestationReport GenRaReport(
-    yacl::ByteContainerView user_data) {
-  // generate kubetee::AttestationReport first
-  kubetee::UnifiedAttestationReport report = GenKubeteeRaReport(user_data);
+  yacl::ByteContainerView user_data) {
 
-  // convert kubetee::AttestationReport to secretflow::AttestationReport
+  std::string quote = GenOcclumQuote(user_data);
+
   secretflowapis::v2::sdc::UnifiedAttestationReport attestation_report;
-  *attestation_report.mutable_str_report_version() =
-      std::move(*(report.mutable_str_report_version()));
-  *attestation_report.mutable_str_report_type() =
-      std::move(*(report.mutable_str_report_type()));
-  *attestation_report.mutable_str_tee_platform() =
-      std::move(*(report.mutable_str_tee_platform()));
-  *attestation_report.mutable_json_report() =
-      std::move(*(report.mutable_json_report()));
+  *attestation_report.mutable_str_report_version() = "1";
+  *attestation_report.mutable_str_report_type() = "JD";
+  *attestation_report.mutable_str_tee_platform() = "Occlum";
+  *attestation_report.mutable_json_report() = quote;
   return attestation_report;
 }
 
 void GetEnclaveInfo(std::string& mr_signer, std::string& mr_enclave) {
-  kubetee::UnifiedAttestationReport report = GenKubeteeRaReport("");
-  rapidjson::Document doc;
-  doc.Parse(report.json_report().c_str());
-  const std::string b64_quote = doc[kB64Quote].GetString();
+  secretflowapis::v2::sdc::UnifiedAttestationReport report = GenRaReport("");
+
+  const std::string b64_quote = report.json_report().c_str();
   std::vector<uint8_t> quote = cppcodec::base64_rfc4648::decode(b64_quote);
 
   sgx_quote_t* pquote = reinterpret_cast<sgx_quote_t*>((quote.data()));

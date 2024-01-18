@@ -51,13 +51,3 @@ rules_foreign_cc_dependencies(
     register_default_tools = False,
     register_preinstalled_tools = True,
 )
-
-git_repository(
-    name = "jinzhao_attest",
-    commit = "8237385449211ee088aafc68e475410937521b6e",
-    remote = "https://github.com/secretflow/jinzhao-attest.git",
-)
-
-load("@jinzhao_attest//bazel:repositories.bzl", "jinzhao_attest_dependencies")
-
-jinzhao_attest_dependencies()

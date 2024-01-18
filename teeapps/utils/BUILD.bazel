@@ -34,8 +34,6 @@ teeapps_cc_library(
         "@com_github_rapidjson//:rapidjson",
         "@com_google_absl//absl/strings",
         "@cppcodec",
-        "@jinzhao_attest//:generation",
-        "@jinzhao_attest//:verification",
         "@yacl//yacl/crypto/base/hash:hash_utils",
     ],
 )
