@@ -42,9 +42,12 @@ std::string GenOcclumQuote(yacl::ByteContainerView user_data) {
             "Fail to get quote size");
 
     auto digest = yacl::crypto::Sha256(user_data);
-    YACL_ENFORCE(digest.size() <= SGX_REPORT_DATA_SIZE, "Report data should be 32");
+    std::string digest_str = absl::BytesToHexString(absl::string_view(
+      reinterpret_cast<const char*>(digest.data()), digest.size()));
+    YACL_ENFORCE(digest_str.size() <= SGX_REPORT_DATA_SIZE, "Report data should be 32");
+
     sgx_report_data_t report_data = { 0 };
-    memcpy(report_data.d, digest.data(), digest.size());
+    memcpy(report_data.d, digest_str.data(), digest_str.size());
 
     std::string quote;
     quote.resize(quote_size, 0);
@@ -73,7 +76,7 @@ secretflowapis::v2::sdc::UnifiedAttestationReport GenRaReport(
   secretflowapis::v2::sdc::UnifiedAttestationReport attestation_report;
   *attestation_report.mutable_str_report_version() = "1";
   *attestation_report.mutable_str_report_type() = "JD";
-  *attestation_report.mutable_str_tee_platform() = "Occlum";
+  *attestation_report.mutable_str_tee_platform() = "SGX_DCAP";
   *attestation_report.mutable_json_report() = quote;
   return attestation_report;
 }

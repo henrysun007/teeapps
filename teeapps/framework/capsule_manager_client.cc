@@ -70,6 +70,7 @@ CapsuleManagerClient::CapsuleManagerClient(
   }
 }
 
+// TODO: verify the attestation_report
 std::string CapsuleManagerClient::GetRaCert() {
   capsule_manager::GetRaCertRequest request;
   capsule_manager::GetRaCertResponse response;
