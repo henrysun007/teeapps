@@ -44,7 +44,7 @@ std::string GenOcclumQuote(yacl::ByteContainerView user_data) {
     auto digest = yacl::crypto::Sha256(user_data);
     std::string digest_str = absl::BytesToHexString(absl::string_view(
       reinterpret_cast<const char*>(digest.data()), digest.size()));
-    YACL_ENFORCE(digest_str.size() <= SGX_REPORT_DATA_SIZE, "Report data should be 32");
+    YACL_ENFORCE(digest_str.size() <= SGX_REPORT_DATA_SIZE, "Report data should be 64");
 
     sgx_report_data_t report_data = { 0 };
     memcpy(report_data.d, digest_str.data(), digest_str.size());
