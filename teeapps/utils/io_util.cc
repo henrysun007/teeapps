@@ -14,8 +14,16 @@
 
 #include "teeapps/utils/io_util.h"
 
+#include <fcntl.h>
 #include <fstream>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
+#include "spdlog/spdlog.h"
 #include "yacl/base/byte_container_view.h"
 #include "yacl/io/stream/file_io.h"
 
@@ -39,14 +47,26 @@ void WriteFile(const std::string& file_path, yacl::ByteContainerView content) {
 
 void CopyFile(const std::string& src_file_path,
               const std::string& dst_file_path) {
-  std::ifstream source_file(src_file_path.c_str(), std::ios::binary);
-  std::ofstream dst_file(dst_file_path.c_str(),
-                         std::ios::binary | std::ios::trunc);
-  YACL_ENFORCE(source_file, "open source file fail.");
-  YACL_ENFORCE(dst_file, "open dst file fail.");
-  dst_file << source_file.rdbuf();
-  source_file.close();
-  dst_file.close();
+  SPDLOG_INFO("copyfile:");
+  SPDLOG_INFO(src_file_path);
+  SPDLOG_INFO(dst_file_path);
+
+  int fromfd = open(src_file_path.c_str(), O_RDONLY);
+  YACL_ENFORCE(fromfd >= 0, "open source file fail.");
+
+  struct stat stat_buf;
+  int ret = fstat (fromfd, &stat_buf);
+  YACL_ENFORCE(ret >= 0, "fstat source file fail.");
+
+  int tofd = open(dst_file_path.c_str(), O_WRONLY | O_CREAT, stat_buf.st_mode);
+  YACL_ENFORCE(tofd >= 0, "open dst file fail.");
+
+  off_t off = 0;
+  int rv = sendfile(tofd, fromfd, &off, stat_buf.st_size);
+  YACL_ENFORCE(rv >= 0, "sendfile fail.");
+
+  close(fromfd);
+  close(tofd);
 }
 
 void MergeVerticalCsv(const std::string& left_file_path,

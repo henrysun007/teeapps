@@ -40,8 +40,8 @@ namespace framework {
 
 namespace {
 const std::unordered_map<std::string, std::string> teeapps_subject_map = {
-    {"C", "CN"},       {"ST", "HZ"},         {"L", "HZ"},
-    {"O", "AntGroup"}, {"OU", "SecretFlow"}, {"CN", "TeeApps"}};
+    {"C", "CN"},       {"ST", "BJ"},         {"L", "BJ"},
+    {"O", "JDGroup"}, {"OU", "AISec"}, {"CN", "TeeApps"}};
 
 constexpr uint8_t kKeyBytes = 32;
 constexpr uint32_t kRsaBitLength = 3072;
