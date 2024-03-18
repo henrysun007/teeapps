@@ -51,21 +51,6 @@ constexpr char kTee[] = "tee";
 constexpr char kMrEnclave[] = "mr_enclave";
 constexpr char kMrSigner[] = "mr_signer";
 constexpr char kSgx[] = "sgx";
-
-std::string GenCmd(const std::string& component_name, const std::string& plat) {
-  const auto py_name = teeapps::framework::comp_py_map.find(component_name);
-  YACL_ENFORCE(py_name != teeapps::framework::comp_py_map.end(),
-               "can not find py_name for {}", component_name);
-  if (plat == teeapps::framework::kPlatSim) {
-    return fmt::format("{},{}/{}", teeapps::framework::kSimPyPath,
-                       teeapps::framework::kSimPyBizPath, py_name->second);
-  } else if (plat == teeapps::framework::kPlatSgx) {
-    return fmt::format("/bin/python3,/{}", py_name->second);
-  } else {
-    YACL_THROW("plat {} not support", plat);
-  }
-}
-
 }  // namespace
 
 App::App(const std::string& plat, const std::string& app_mode,
@@ -121,8 +106,6 @@ App::App(const std::string& plat, const std::string& app_mode,
 void App::Run() {
   try {
     PreProcess();
-    ExecCmd();
-    PostProcess();
   } catch (const std::exception& e) {
     SPDLOG_ERROR("Running TEE application failed, error message: {}", e.what());
     std::string err_detail =
@@ -282,21 +265,13 @@ void App::PreProcess() {
               node_eval_param_.domain(), node_eval_param_.name(),
               node_eval_param_.version());
 
-  // Step 1 verify node_eval_params with component_def
-  const auto eval_param_reader =
-      teeapps::component::EvalParamReader(&node_eval_param_, &component_def_);
+  SPDLOG_WARN("Bypass node_eval_params with component_def verification");
 
   // Step 2 generate ResourceRequest and get data keys from capsule manager
   std::unordered_map<std::string, std::string> data_keys_map;
   GetInputDataKeys(data_keys_map);
   // Step 3 download data, decrypt Data to data path
   ProcessInput(data_keys_map);
-
-  // Step 4 convert component instance to task execution config
-  teeapps::utils::GenAndDumpTaskConfig(app_mode_, component_def_,
-                                       eval_param_reader);
-
-  cmd_ = GenCmd(component_def_.name(), plat_);
 
   SPDLOG_INFO("Pre-processing, component {}-{}-{} succeed...",
               node_eval_param_.domain(), node_eval_param_.name(),

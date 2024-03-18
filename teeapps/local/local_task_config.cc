@@ -32,7 +32,6 @@ namespace {
 
 constexpr char kTaskInputConfig[] = "task_input_config";
 constexpr char kTeeTaskConfig[] = "tee_task_config";
-constexpr char kConcatDelimiter[] = ".";
 
 const rapidjson::Value& GetValueByKey(const rapidjson::Document& doc,
                                       const std::string& key) {
@@ -73,33 +72,7 @@ void LocalTaskConfig::SetFromJson(const std::string& local_task_config_json) {
                           tee_task_config_str);
   JSON2PB(tee_task_config_str, &tee_task_config_);
 
-  int certs_num = tee_task_config_.task_initiator_certs_size();
-  YACL_ENFORCE(certs_num >= 1, "task_initiator_certs empty");
-  // verify certs
-  if (certs_num > 1) {
-    for (int i = certs_num - 1; i > 0; i--) {
-      YACL_ENFORCE(teeapps::utils::VerifyX509Cert(
-                       tee_task_config_.task_initiator_certs(i - 1),
-                       tee_task_config_.task_initiator_certs(i)),
-                   "invalid x509 cert. index:{}. content:{}", i - 1,
-                   tee_task_config_.task_initiator_certs(i - 1));
-    }
-  }
-
-  // verify signature
-  const auto signature =
-      cppcodec::base64_rfc4648::decode(tee_task_config_.signature());
-  if (tee_task_config_.sign_algorithm() == teeapps::utils::kRs256) {
-    yacl::crypto::RsaVerifier::CreateFromCertPem(
-        tee_task_config_.task_initiator_certs(0))
-        ->Verify(tee_task_config_.task_initiator_id() + kConcatDelimiter +
-                     tee_task_config_.scope() + kConcatDelimiter +
-                     tee_task_config_.task_body(),
-                 signature);
-  } else {
-    YACL_THROW("sign_algorithm {} not support",
-               tee_task_config_.sign_algorithm());
-  }
+  SPDLOG_WARN("Bypass the certificate and signature verification");
 
   const auto task_body_bytes =
       cppcodec::base64_rfc4648::decode(tee_task_config_.task_body());

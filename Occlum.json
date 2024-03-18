@@ -27,7 +27,7 @@
   "metadata": {
     "product_id": 1200,
     "version_number": 0,
-    "debuggable": false,
+    "debuggable": true,
     "enable_kss": false,
     "family_id": {
       "high": "0x0",
