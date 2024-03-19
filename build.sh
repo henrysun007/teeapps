@@ -25,6 +25,9 @@ workspace_dir="$script_dir"
 target_dir="/home/teeapp"
 python_dir="$target_dir/python-occlum"
 
+conda config --set show_channel_urls yes
+cp .condarc ~/
+
 mkdir -p $target_dir/task
 
 bazel --output_base=target build -c opt --define tee_type=sgx2 //teeapps/...

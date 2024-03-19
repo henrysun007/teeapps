@@ -17,7 +17,7 @@ FROM secretflow/teeapps-gcc11-dev:0.1.0b0 as builder
 
 WORKDIR /home/admin/dev
 
-COPY .bazelrc .bazelversion build.sh BUILD.bazel Occlum.json python.yaml WORKSPACE ./
+COPY .condarc .bazelrc .bazelversion build.sh BUILD.bazel Occlum.json python.yaml WORKSPACE ./
 COPY teeapps ./teeapps
 COPY integration_test ./integration_test
 COPY bazel ./bazel
@@ -50,3 +50,12 @@ ENV PATH /home/teeapp/python-occlum/bin:$PATH
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
 
 WORKDIR /home/teeapp/occlum/occlum_instance
+
+RUN mkdir -p /host/data
+RUN cd image && mkdir -p home/kuscia/var/storage/ && \
+    ln -s /host/data home/kuscia/var/storage/data && \
+    mkdir -p home/jd/db
+
+RUN apt-key del SGX_DCAP_repo_sign_key && apt install wget -y && \
+    wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add && \
+    apt update && apt install g++ libsgx-enclave-common-dev libsgx-dcap-ql-dev libsgx-dcap-default-qpl-dev -y
